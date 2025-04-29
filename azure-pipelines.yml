@@ -1,48 +1,55 @@
 trigger:
-  branches:
-    include:
-      - main
+- main
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  KUBE_NAMESPACE: monitoring
+  aksResourceGroup: 'RG02'
+  aksClusterName: 'RG02-AKS1'
+  subscriptionId: 'aab3378c-ce10-4a02-a67f-bd35bc48e60f'
+  objectId: '1a0227bc-6295-4d6a-9586-c13ec5c262f5'  # substitua pelo objectId da Service Connection do DevOps
+  prometheusNamespace: 'monitoring'
 
 stages:
-- stage: DeployMonitoringStack
+- stage: DeployMonitoring
   jobs:
-  - job: InstallMonitoring
+  - job: Deploy
     steps:
 
     - task: AzureCLI@2
+      displayName: 'Login e configurar acesso ao AKS'
       inputs:
-        azureSubscription: 'Terraform-automation'
+        azureSubscription: 'Terraform-automation'  # nome da Service Connection
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
-          # Set AKS context
-          az aks get-credentials --resource-group SeuRG --name RG02-AKS1 --overwrite-existing
+          echo "🔐 Concedendo permissão de Cluster Admin..."
+          az role assignment create \
+            --assignee $objectId \
+            --role "Azure Kubernetes Service Cluster Admin Role" \
+            --scope /subscriptions/$subscriptionId/resourceGroups/$aksResourceGroup/providers/Microsoft.ContainerService/managedClusters/$aksClusterName \
+            || echo "Permissão já atribuída ou erro não crítico."
 
-          # Create namespace if not exists
-          kubectl create namespace $KUBE_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+          echo "🔧 Acessando cluster AKS..."
+          az aks get-credentials --resource-group $aksResourceGroup --name $aksClusterName --overwrite-existing
 
-          # Add Helm repo e update
+          echo "🛠️ Criando namespace '$prometheusNamespace' (se não existir)..."
+          kubectl create namespace $prometheusNamespace --dry-run=client -o yaml | kubectl apply -f -
+
+          echo "📦 Adicionando repositórios Helm..."
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm repo add grafana https://grafana.github.io/helm-charts
           helm repo update
 
-          # Instalar Prometheus
+          echo "📈 Instalando Prometheus..."
           helm upgrade --install prometheus prometheus-community/prometheus \
-            --namespace $KUBE_NAMESPACE \
-            --set server.service.type=LoadBalancer
+            --namespace $prometheusNamespace
 
-          # Instalar Grafana
+          echo "📊 Instalando Grafana..."
           helm upgrade --install grafana grafana/grafana \
-            --namespace $KUBE_NAMESPACE \
-            --set service.type=LoadBalancer \
-            --set adminPassword='admin'
+            --namespace $prometheusNamespace \
+            --set adminPassword='admin' \
+            --set service.type=LoadBalancer
 
-          echo "Aguardando IP externo do Grafana..."
-          sleep 30
-          kubectl get svc -n $KUBE_NAMESPACE
+          echo "✅ Implantação concluída."
