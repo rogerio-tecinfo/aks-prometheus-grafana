@@ -1,0 +1,28 @@
+adminUser: admin
+adminPassword: admin # Altere em produção! Use segredo no pipeline se preferir
+
+service:
+  type: LoadBalancer
+
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClassName: default
+
+resources:
+  limits:
+    cpu: 300m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 256Mi
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-server.monitoring.svc.cluster.local
+        access: proxy
+        isDefault: true
