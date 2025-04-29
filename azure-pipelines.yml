@@ -1,0 +1,48 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  KUBE_NAMESPACE: monitoring
+
+stages:
+- stage: DeployMonitoringStack
+  jobs:
+  - job: InstallMonitoring
+    steps:
+
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'NomeDaSuaConexaoAzure'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          # Set AKS context
+          az aks get-credentials --resource-group SeuRG --name RG02-AKS1 --overwrite-existing
+
+          # Create namespace if not exists
+          kubectl create namespace $KUBE_NAMESPACE --dry-run=client -o yaml | kubectl apply -f -
+
+          # Add Helm repo e update
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo update
+
+          # Instalar Prometheus
+          helm upgrade --install prometheus prometheus-community/prometheus \
+            --namespace $KUBE_NAMESPACE \
+            --set server.service.type=LoadBalancer
+
+          # Instalar Grafana
+          helm upgrade --install grafana grafana/grafana \
+            --namespace $KUBE_NAMESPACE \
+            --set service.type=LoadBalancer \
+            --set adminPassword='admin'
+
+          echo "Aguardando IP externo do Grafana..."
+          sleep 30
+          kubectl get svc -n $KUBE_NAMESPACE
