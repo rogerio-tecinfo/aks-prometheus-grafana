@@ -10,8 +10,8 @@ variables:
   subscriptionId: 'aab3378c-ce10-4a02-a67f-bd35bc48e60f'
   objectId: '1a0227bc-6295-4d6a-9586-c13ec5c262f5'
   prometheusNamespace: 'monitoring'
-  azureADClientId: '<seu-client-id>' # Substitua pelo Client ID da sua App Registration
-  azureADTenantId: '<seu-tenant-id>' # Substitua pelo Tenant ID da sua organização
+  azureADClientId: 'cf968ae1-6deb-454f-8244-993b7c8a864f' # Substitua pelo Client ID da sua App Registration
+  azureADTenantId: 'b7a7b567-4287-48aa-9755-ec5b5ec68021' # Substitua pelo Tenant ID da sua organização
   grafanaAdminPassword: 'admin' # Ou outra senha desejada
   azureADClientSecretValue: '$(grafanaAzureADClientSecret)' # Referência à variável secreta
 
