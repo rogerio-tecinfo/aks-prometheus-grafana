@@ -12,7 +12,7 @@ variables:
   prometheusNamespace: 'monitoring'
   azureADClientId: 'cf968ae1-6deb-454f-8244-993b7c8a864f' # Substitua pelo Client ID da sua App Registration
   azureADTenantId: 'b7a7b567-4287-48aa-9755-ec5b5ec68021' # Substitua pelo Tenant ID da sua organização
-  azureADClientSecretValue: $(nomeDaVariavelSecreta) # Substitua pelo seu Client Secret real
+  azureADClientSecretValue: $(azureADClientSecretValue) # Substitua pelo seu Client Secret real
 
 stages:
 - stage: DeployMonitoring
@@ -34,7 +34,9 @@ stages:
             --from-literal=client-secret="$(azureADClientSecretValue)" \
             --dry-run=client -o yaml | kubectl apply -f -
           echo "✅ Secret criado com sucesso."
-
+        environmentVariables:
+            AZUREADCLIENTSECRETVALUE: $(azureADClientSecretValue)
+            
     - task: AzureCLI@2
       displayName: '🔧 Configurar AKS e instalar Prometheus/Grafana'
       inputs:
