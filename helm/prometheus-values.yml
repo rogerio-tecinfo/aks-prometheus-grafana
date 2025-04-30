@@ -13,3 +13,8 @@ alertmanager:
   enabled: true
   service:
     type: ClusterIP
+
+scrape_configs:
+  - job_name: 'azure_resource_excel'
+    static_configs:
+      - targets: ['localhost:8000']  # ou 'localhost:8000'
