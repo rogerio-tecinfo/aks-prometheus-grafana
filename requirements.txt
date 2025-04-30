@@ -1,0 +1,3 @@
+Flask
+pandas
+openpyxl  # Se você realmente precisa ler XLSX no ambiente do container

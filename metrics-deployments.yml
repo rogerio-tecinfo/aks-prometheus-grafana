@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metrics-app
+spec:
+  replicas: 1 # Defina o número de cópias que você quer rodando
+  selector:
+    matchLabels:
+      app: metrics-app
+  template:
+    metadata:
+      labels:
+        app: metrics-app
+    spec:
+      containers:
+        - name: metrics-container
+          image: rsprazeres/azure-metrics:latest
+          ports:
+            - containerPort: 8000
