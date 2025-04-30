@@ -13,7 +13,7 @@ variables:
   azureADClientId: 'cf968ae1-6deb-454f-8244-993b7c8a864f' # Substitua pelo Client ID da sua App Registration
   azureADTenantId: 'b7a7b567-4287-48aa-9755-ec5b5ec68021' # Substitua pelo Tenant ID da sua organização
   grafanaAdminPassword: 'admin' # Ou outra senha desejada
-  azureADClientSecretValue: '$(grafanaAzureADClientSecret)' # Referência à variável secreta
+  grafanaAzureADClientSecret: '$(grafana-azuread-client-secret)' # Referência à variável secreta
 
 stages:
 - stage: DeployMonitoring
@@ -28,7 +28,7 @@ stages:
         scriptLocation: 'inlineScript'
         inlineScript: |
           set -e
-          
+
           echo "🔑 Obtendo credenciais do AKS..."
           KUBECONFIG=$(mktemp)
           az aks get-credentials --resource-group "$(aksResourceGroup)" --name "$(aksClusterName)" --file "$KUBECONFIG" --overwrite-existing
@@ -46,6 +46,8 @@ stages:
             --from-literal=client-secret="$AZUREADCLIENTSECRETVALUE" \
             --dry-run=client -o yaml | kubectl apply -f -
           echo "✅ Secret criado com sucesso."
+        environmentVariables:
+          AZUREADCLIENTSECRETVALUE: $(grafanaAzureADClientSecret)
 
     - task: AzureCLI@2
       displayName: '⚙️ Criar ConfigMap para Configuração do Grafana Azure AD'
@@ -55,6 +57,17 @@ stages:
         scriptLocation: 'inlineScript'
         inlineScript: |
           set -e
+
+          echo "🔑 Obtendo credenciais do AKS..."
+          KUBECONFIG=$(mktemp)
+          az aks get-credentials --resource-group "$(aksResourceGroup)" --name "$(aksClusterName)" --file "$KUBECONFIG" --overwrite-existing
+
+          echo "📝 Definindo a variável de ambiente KUBECONFIG..."
+          export KUBECONFIG="$KUBECONFIG"
+
+          echo "🔎 Verificando contexto do kubectl ANTES da criação do ConfigMap..."
+          kubectl config current-context
+          kubectl cluster-info
 
           cat <<EOF | kubectl apply -f -
           apiVersion: v1
@@ -67,7 +80,7 @@ stages:
               [auth.azuread]
               enabled = true
               client_id = "$(azureADClientId)"
-              client_secret = "$(CLIENT_SECRET)"
+              client_secret = "$(GRAFANA_CLIENT_SECRET)"
               tenant_id = "$(azureADTenantId)"
               auth_url = "https://login.microsoftonline.com/$(azureADTenantId)/oauth2/authorize"
               token_url = "https://login.microsoftonline.com/$(azureADTenantId)/oauth2/token"
@@ -81,6 +94,8 @@ stages:
               login_attribute_path =
           EOF
           echo "✅ ConfigMap grafana-azuread-config criado com sucesso."
+        environmentVariables:
+          GRAFANA_CLIENT_SECRET: $(grafanaAzureADClientSecret)
 
     - task: AzureCLI@2
       displayName: '🔧 Configurar AKS e instalar Prometheus/Grafana'
