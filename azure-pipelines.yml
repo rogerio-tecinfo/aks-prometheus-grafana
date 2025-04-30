@@ -25,23 +25,23 @@ stages:
         scriptLocation: 'inlineScript'
         inlineScript: |
           set -e
-          
+
           echo "🔐 Garantindo permissões de Cluster Admin..."
           az role assignment create \
-            --assignee $objectId \
+            --assignee "$(objectId)" \
             --role "Azure Kubernetes Service Cluster Admin Role" \
-            --scope /subscriptions/$subscriptionId/resourceGroups/$aksResourceGroup/providers/Microsoft.ContainerService/managedClusters/$aksClusterName \
+            --scope /subscriptions/$(subscriptionId)/resourceGroups/$(aksResourceGroup)/providers/Microsoft.ContainerService/managedClusters/$(aksClusterName) \
             || echo "Permissão já atribuída ou já existente."
 
           echo "🔧 Acessando o cluster AKS..."
-          az aks get-credentials --resource-group $aksResourceGroup --name $aksClusterName --overwrite-existing
+          az aks get-credentials --resource-group $(aksResourceGroup) --name $(aksClusterName) --overwrite-existing
 
           echo "🔎 Verificando contexto do kubectl..."
           kubectl config get-contexts
           kubectl config current-context
 
-          echo "📁 Criando namespace '$prometheusNamespace'..."
-          kubectl create namespace $prometheusNamespace --dry-run=client -o yaml | kubectl apply -f -
+          echo "📁 Criando namespace '$(prometheusNamespace)'..."
+          kubectl create namespace $(prometheusNamespace) --dry-run=client -o yaml | kubectl apply -f -
 
           echo "📦 Adicionando repositórios Helm..."
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -50,14 +50,14 @@ stages:
 
           echo "📈 Instalando Prometheus..."
           helm upgrade --install prometheus prometheus-community/prometheus \
-            --namespace $prometheusNamespace \
+            --namespace $(prometheusNamespace) \
             --set server.service.type=LoadBalancer
 
           echo "📊 Instalando Grafana..."
           helm upgrade --install grafana grafana/grafana \
-            --namespace $prometheusNamespace \
+            --namespace $(prometheusNamespace) \
             --set adminPassword='admin' \
             --set service.type=LoadBalancer
 
-          echo "⏳ Aguardando recursos..."
-          kubectl get all -n $prometheusNamespace
+          echo "⏳ Verificando recursos..."
+          kubectl get all -n $(prometheusNamespace)
