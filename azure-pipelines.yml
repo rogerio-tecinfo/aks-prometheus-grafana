@@ -35,9 +35,7 @@ stages:
             --from-literal=client-secret="$AZUREADCLIENTSECRETVALUE" \
             --dry-run=client -o yaml | kubectl apply -f -
           echo "✅ Secret criado com sucesso."
-        environmentVariables:
-          AZUREADCLIENTSECRETVALUE: $(azureADClientSecretValue)
-
+                
     - task: AzureCLI@2
       displayName: '⚙️ Criar ConfigMap para Configuração do Grafana Azure AD'
       inputs:
