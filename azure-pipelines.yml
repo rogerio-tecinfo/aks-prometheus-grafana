@@ -27,7 +27,11 @@ stages:
         scriptLocation: 'inlineScript'
         inlineScript: |
           set -e
-
+          
+          echo "🔎 Verificando contexto do kubectl..."
+          kubectl config current-context
+          kubectl cluster-info
+          
           echo "🔑 Criando Kubernetes Secret 'grafana-azuread-secret' no namespace '$(prometheusNamespace)'..."
           kubectl create secret generic grafana-azuread-secret \
             --namespace=$(prometheusNamespace) \
