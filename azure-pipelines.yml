@@ -8,7 +8,7 @@ variables:
   aksResourceGroup: 'RG02'
   aksClusterName: 'RG02-AKS1'
   subscriptionId: 'aab3378c-ce10-4a02-a67f-bd35bc48e60f'
-  objectId: '1a0227bc-6295-4d6a-9586-c13ec5c262f5'  # substitua pelo objectId da Service Connection do DevOps
+  objectId: '1a0227bc-6295-4d6a-9586-c13ec5c262f5'
   prometheusNamespace: 'monitoring'
 
 stages:
@@ -18,23 +18,29 @@ stages:
     steps:
 
     - task: AzureCLI@2
-      displayName: 'Login e configurar acesso ao AKS'
+      displayName: '🔧 Configurar AKS e instalar Prometheus/Grafana'
       inputs:
-        azureSubscription: 'Terraform-automation'  # nome da Service Connection
+        azureSubscription: 'Terraform-automation'
         scriptType: 'bash'
         scriptLocation: 'inlineScript'
         inlineScript: |
-          echo "🔐 Concedendo permissão de Cluster Admin..."
+          set -e
+          
+          echo "🔐 Garantindo permissões de Cluster Admin..."
           az role assignment create \
             --assignee $objectId \
             --role "Azure Kubernetes Service Cluster Admin Role" \
             --scope /subscriptions/$subscriptionId/resourceGroups/$aksResourceGroup/providers/Microsoft.ContainerService/managedClusters/$aksClusterName \
-            || echo "Permissão já atribuída ou erro não crítico."
+            || echo "Permissão já atribuída ou já existente."
 
-          echo "🔧 Acessando cluster AKS..."
+          echo "🔧 Acessando o cluster AKS..."
           az aks get-credentials --resource-group $aksResourceGroup --name $aksClusterName --overwrite-existing
 
-          echo "🛠️ Criando namespace '$prometheusNamespace' (se não existir)..."
+          echo "🔎 Verificando contexto do kubectl..."
+          kubectl config get-contexts
+          kubectl config current-context
+
+          echo "📁 Criando namespace '$prometheusNamespace'..."
           kubectl create namespace $prometheusNamespace --dry-run=client -o yaml | kubectl apply -f -
 
           echo "📦 Adicionando repositórios Helm..."
@@ -44,7 +50,8 @@ stages:
 
           echo "📈 Instalando Prometheus..."
           helm upgrade --install prometheus prometheus-community/prometheus \
-            --namespace $prometheusNamespace
+            --namespace $prometheusNamespace \
+            --set server.service.type=LoadBalancer
 
           echo "📊 Instalando Grafana..."
           helm upgrade --install grafana grafana/grafana \
@@ -52,4 +59,5 @@ stages:
             --set adminPassword='admin' \
             --set service.type=LoadBalancer
 
-          echo "✅ Implantação concluída."
+          echo "⏳ Aguardando recursos..."
+          kubectl get all -n $prometheusNamespace
