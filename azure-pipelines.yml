@@ -28,6 +28,17 @@ stages:
         scriptLocation: 'inlineScript'
         inlineScript: |
           set -e
+          
+          echo "🔑 Obtendo credenciais do AKS..."
+          KUBECONFIG=$(mktemp)
+          az aks get-credentials --resource-group "$(aksResourceGroup)" --name "$(aksClusterName)" --file "$KUBECONFIG" --overwrite-existing
+
+          echo "📝 Definindo a variável de ambiente KUBECONFIG..."
+          export KUBECONFIG="$KUBECONFIG"
+
+          echo "🔎 Verificando contexto do kubectl ANTES da criação do Secret..."
+          kubectl config current-context
+          kubectl cluster-info
 
           echo "🔑 Criando Kubernetes Secret 'grafana-azuread-secret' no namespace '$(prometheusNamespace)'..."
           kubectl create secret generic grafana-azuread-secret \
@@ -35,7 +46,7 @@ stages:
             --from-literal=client-secret="$AZUREADCLIENTSECRETVALUE" \
             --dry-run=client -o yaml | kubectl apply -f -
           echo "✅ Secret criado com sucesso."
-                
+
     - task: AzureCLI@2
       displayName: '⚙️ Criar ConfigMap para Configuração do Grafana Azure AD'
       inputs:
