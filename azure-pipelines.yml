@@ -134,8 +134,16 @@ stages:
             --namespace $(prometheusNamespace) \
             --set adminPassword="$(grafanaAdminPassword)" \
             --set service.type=LoadBalancer \
-            --set volumes='[{"name": "grafana-config", "configMap": {"name": "grafana-azuread-config"}}, {"name": "grafana-secrets", "secret": {"secretName": "grafana-azuread-secret"}}]' \
-            --set volumeMounts='[{"name": "grafana-config", "mountPath": "/etc/grafana/grafana.ini", "subPath": "grafana.ini"}, {"name": "grafana-secrets", "mountPath": "/etc/grafana/grafana.ini", "subPath": "client-secret"}]'
+            --set "volumes[0].name"="grafana-config" \
+            --set "volumes[0].configMap.name"="grafana-azuread-config" \
+            --set "volumes[1].name"="grafana-secrets" \
+            --set "volumes[1].secret.secretName"="grafana-azuread-secret" \
+            --set "volumeMounts[0].name"="grafana-config" \
+            --set "volumeMounts[0].mountPath"="/etc/grafana/grafana.ini" \
+            --set "volumeMounts[0].subPath"="grafana.ini" \
+            --set "volumeMounts[1].name"="grafana-secrets" \
+            --set "volumeMounts[1].mountPath"="/etc/grafana/grafana.ini" \
+            --set "volumeMounts[1].subPath"="client-secret"
 
           echo "⏳ Verificando recursos..."
           kubectl get all -n $(prometheusNamespace)
