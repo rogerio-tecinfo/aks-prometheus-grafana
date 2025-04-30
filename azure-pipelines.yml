@@ -46,9 +46,7 @@ stages:
             --from-literal=client-secret="$AZUREADCLIENTSECRETVALUE" \
             --dry-run=client -o yaml | kubectl apply -f -
           echo "✅ Secret criado com sucesso."
-        environmentVariables:
-          AZUREADCLIENTSECRETVALUE: $(grafanaAzureADClientSecret)
-
+        
     - task: AzureCLI@2
       displayName: '⚙️ Criar ConfigMap para Configuração do Grafana Azure AD'
       inputs:
@@ -94,9 +92,7 @@ stages:
               login_attribute_path =
           EOF
           echo "✅ ConfigMap grafana-azuread-config criado com sucesso."
-        environmentVariables:
-          GRAFANA_CLIENT_SECRET: $(grafanaAzureADClientSecret)
-
+        
     - task: AzureCLI@2
       displayName: '🔧 Configurar AKS e instalar Prometheus/Grafana'
       inputs:
