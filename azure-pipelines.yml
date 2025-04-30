@@ -21,80 +21,7 @@ stages:
   - job: Deploy
     steps:
     - task: AzureCLI@2
-      displayName: '🔐 Criar Secret para Client Secret do Azure AD'
-      inputs:
-        azureSubscription: 'Terraform-automation'
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
-          set -e
-
-          echo "🔑 Obtendo credenciais do AKS..."
-          KUBECONFIG=$(mktemp)
-          az aks get-credentials --resource-group "$(aksResourceGroup)" --name "$(aksClusterName)" --file "$KUBECONFIG" --overwrite-existing
-
-          echo "📝 Definindo a variável de ambiente KUBECONFIG..."
-          export KUBECONFIG="$KUBECONFIG"
-
-          echo "🔎 Verificando contexto do kubectl ANTES da criação do Secret..."
-          kubectl config current-context
-          kubectl cluster-info
-
-          echo "🔑 Criando Kubernetes Secret 'grafana-azuread-secret' no namespace '$(prometheusNamespace)'..."
-          kubectl create secret generic grafana-azuread-secret \
-            --namespace=$(prometheusNamespace) \
-            --from-literal=client-secret="$AZUREADCLIENTSECRETVALUE" \
-            --dry-run=client -o yaml | kubectl apply -f -
-          echo "✅ Secret criado com sucesso."
-        
-    - task: AzureCLI@2
-      displayName: '⚙️ Criar ConfigMap para Configuração do Grafana Azure AD'
-      inputs:
-        azureSubscription: 'Terraform-automation'
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
-        inlineScript: |
-          set -e
-
-          echo "🔑 Obtendo credenciais do AKS..."
-          KUBECONFIG=$(mktemp)
-          az aks get-credentials --resource-group "$(aksResourceGroup)" --name "$(aksClusterName)" --file "$KUBECONFIG" --overwrite-existing
-
-          echo "📝 Definindo a variável de ambiente KUBECONFIG..."
-          export KUBECONFIG="$KUBECONFIG"
-
-          echo "🔎 Verificando contexto do kubectl ANTES da criação do ConfigMap..."
-          kubectl config current-context
-          kubectl cluster-info
-
-          cat <<EOF | kubectl apply -f -
-          apiVersion: v1
-          kind: ConfigMap
-          metadata:
-            name: grafana-azuread-config
-            namespace: $(prometheusNamespace)
-          data:
-            grafana.ini: |
-              [auth.azuread]
-              enabled = true
-              client_id = "$(azureADClientId)"
-              client_secret = "$(GRAFANA_CLIENT_SECRET)"
-              tenant_id = "$(azureADTenantId)"
-              auth_url = "https://login.microsoftonline.com/$(azureADTenantId)/oauth2/authorize"
-              token_url = "https://login.microsoftonline.com/$(azureADTenantId)/oauth2/token"
-              allowed_domains =
-              allow_sign_up = true
-              auto_login = false
-              name = Azure AD
-              role_attribute_path =
-              groups_attribute_path =
-              email_attribute_path =
-              login_attribute_path =
-          EOF
-          echo "✅ ConfigMap grafana-azuread-config criado com sucesso."
-        
-    - task: AzureCLI@2
-      displayName: '🔧 Configurar AKS e instalar Prometheus/Grafana'
+      displayName: '🔧 Configurar AKS e instalar Prometheus/Grafana com Azure AD'
       inputs:
         azureSubscription: 'Terraform-automation'
         scriptType: 'bash'
@@ -129,21 +56,20 @@ stages:
             --namespace $(prometheusNamespace) \
             --set server.service.type=LoadBalancer
 
-          echo "📊 Instalando Grafana..."
+          echo "📊 Instalando Grafana com autenticação Azure AD..."
           helm upgrade --install grafana grafana/grafana \
             --namespace $(prometheusNamespace) \
             --set adminPassword="$(grafanaAdminPassword)" \
             --set service.type=LoadBalancer \
-            --set "volumes[0].name"="grafana-config" \
-            --set "volumes[0].configMap.name"="grafana-azuread-config" \
-            --set "volumes[1].name"="grafana-secrets" \
-            --set "volumes[1].secret.secretName"="grafana-azuread-secret" \
-            --set "volumeMounts[0].name"="grafana-config" \
-            --set "volumeMounts[0].mountPath"="/etc/grafana/grafana.ini" \
-            --set "volumeMounts[0].subPath"="grafana.ini" \
-            --set "volumeMounts[1].name"="grafana-secrets" \
-            --set "volumeMounts[1].mountPath"="/etc/grafana/grafana.ini" \
-            --set "volumeMounts[1].subPath"="client-secret"
+            --set "grafana.ini.auth.azuread.enabled=true" \
+            --set "grafana.ini.auth.azuread.client_id=$(azureADClientId)" \
+            --set "grafana.ini.auth.azuread.client_secret=$(grafanaAzureADClientSecret)" \
+            --set "grafana.ini.auth.azuread.tenant_id=$(azureADTenantId)" \
+            --set "grafana.ini.auth.azuread.auth_url=https://login.microsoftonline.com/$(azureADTenantId)/oauth2/v2.0/authorize" \
+            --set "grafana.ini.auth.azuread.token_url=https://login.microsoftonline.com/$(azureADTenantId)/oauth2/v2.0/token" \
+            --set "grafana.ini.auth.azuread.allow_sign_up=true" \
+            --set "grafana.ini.auth.azuread.auto_login=false" \
+            --set "grafana.ini.auth.azuread.scopes=openid email profile"
 
           echo "⏳ Verificando recursos..."
           kubectl get all -n $(prometheusNamespace)
