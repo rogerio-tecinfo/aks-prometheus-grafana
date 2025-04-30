@@ -13,7 +13,7 @@ variables:
   azureADClientId: 'cf968ae1-6deb-454f-8244-993b7c8a864f' # Substitua pelo Client ID da sua App Registration
   azureADTenantId: 'b7a7b567-4287-48aa-9755-ec5b5ec68021' # Substitua pelo Tenant ID da sua organização
   grafanaAdminPassword: 'admin' # Ou outra senha desejada
-  grafanaAzureADClientSecret: '$(grafana-azuread-client-secret)' # Referência à variável secreta
+  grafanaAzureADClientSecret: '$(azureADClientSecretValue)' # Referência à variável secreta
 
 stages:
 - stage: DeployMonitoring
