@@ -28,10 +28,17 @@ stages:
         inlineScript: |
           set -e
           
+          echo "🔑 Obtendo credenciais do AKS..."
+          KUBECONFIG=$(mktemp)
+          az aks get-credentials --resource-group "$(aksResourceGroup)" --name "$(aksClusterName)" --file "$KUBECONFIG" --overwrite-existing
+
+          echo "📝 Definindo a variável de ambiente KUBECONFIG..."
+          export KUBECONFIG="$KUBECONFIG"
+
           echo "🔎 Verificando contexto do kubectl..."
           kubectl config current-context
           kubectl cluster-info
-          
+
           echo "🔑 Criando Kubernetes Secret 'grafana-azuread-secret' no namespace '$(prometheusNamespace)'..."
           kubectl create secret generic grafana-azuread-secret \
             --namespace=$(prometheusNamespace) \
