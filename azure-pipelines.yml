@@ -10,12 +10,30 @@ variables:
   subscriptionId: 'aab3378c-ce10-4a02-a67f-bd35bc48e60f'
   objectId: '1a0227bc-6295-4d6a-9586-c13ec5c262f5'
   prometheusNamespace: 'monitoring'
+  azureADClientId: 'cf968ae1-6deb-454f-8244-993b7c8a864f' # Substitua pelo Client ID da sua App Registration
+  azureADTenantId: 'b7a7b567-4287-48aa-9755-ec5b5ec68021' # Substitua pelo Tenant ID da sua organização
+  azureADClientSecretValue: $(nomeDaVariavelSecreta) # Substitua pelo seu Client Secret real
 
 stages:
 - stage: DeployMonitoring
   jobs:
   - job: Deploy
     steps:
+    - task: AzureCLI@2
+      displayName: '🔐 Criar Secret para Client Secret do Azure AD'
+      inputs:
+        azureSubscription: 'Terraform-automation'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          set -e
+
+          echo "🔑 Criando Kubernetes Secret 'grafana-azuread-secret' no namespace '$(prometheusNamespace)'..."
+          kubectl create secret generic grafana-azuread-secret \
+            --namespace=$(prometheusNamespace) \
+            --from-literal=client-secret="$(azureADClientSecretValue)" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          echo "✅ Secret criado com sucesso."
 
     - task: AzureCLI@2
       displayName: '🔧 Configurar AKS e instalar Prometheus/Grafana'
@@ -53,11 +71,25 @@ stages:
             --namespace $(prometheusNamespace) \
             --set server.service.type=LoadBalancer
 
-          echo "📊 Instalando Grafana..."
+          echo "📊 Instalando Grafana com Autenticação Entra ID..."
           helm upgrade --install grafana grafana/grafana \
             --namespace $(prometheusNamespace) \
             --set adminPassword='admin' \
-            --set service.type=LoadBalancer
+            --set service.type=LoadBalancer \
+            --set auth.azuread.enabled=true \
+            --set auth.azuread.clientId="$(azureADClientId)" \
+            --set auth.azuread.clientSecret="$(kubectl get secret -n $(prometheusNamespace) grafana-azuread-secret -o jsonpath='{.data.client-secret}' | base64 --decode)" \
+            --set auth.azuread.tenantId="$(azureADTenantId)" \
+            --set auth.azuread.authUrl="https://login.microsoftonline.com/$(azureADTenantId)/oauth2/authorize" \
+            --set auth.azuread.tokenUrl="https://login.microsoftonline.com/$(azureADTenantId)/oauth2/token" \
+            --set auth.azuread.allowedDomains="" \
+            --set auth.azuread.allowSignUp=true \
+            --set auth.azuread.autoLogin=false \
+            --set auth.azuread.name="Azure AD" \
+            --set auth.azuread.roleAttributePath="" \
+            --set auth.azuread.groupsAttributePath="" \
+            --set auth.azuread.emailAttributePath="" \
+            --set auth.azuread.loginAttributePath=""
 
           echo "⏳ Verificando recursos..."
           kubectl get all -n $(prometheusNamespace)
